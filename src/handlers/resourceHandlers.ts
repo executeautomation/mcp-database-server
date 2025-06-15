@@ -1,12 +1,13 @@
 import { dbAll, getListTablesQuery, getDescribeTableQuery, getDatabaseMetadata } from '../db/index.js';
 
 /**
- * Handle listing resources request
+ * Handle listing resources request for a specific database
+ * @param dbId Database identifier
  * @returns List of available resources
  */
-export async function handleListResources() {
+export async function handleListResources(dbId: string) {
   try {
-    const dbInfo = getDatabaseMetadata();
+    const dbInfo = getDatabaseMetadata(dbId);
     const dbType = dbInfo.type;
     let resourceBaseUrl: URL;
     
@@ -22,8 +23,8 @@ export async function handleListResources() {
     const SCHEMA_PATH = "schema";
 
     // Use adapter-specific query to list tables
-    const query = getListTablesQuery();
-    const result = await dbAll(query);
+    const query = getListTablesQuery(dbId);
+    const result = await dbAll(dbId, query);
     
     return {
       resources: result.map((row: any) => ({
@@ -38,11 +39,12 @@ export async function handleListResources() {
 }
 
 /**
- * Handle reading a specific resource
+ * Handle reading a specific resource for a specific database
+ * @param dbId Database identifier
  * @param uri URI of the resource to read
  * @returns Resource contents
  */
-export async function handleReadResource(uri: string) {
+export async function handleReadResource(dbId: string, uri: string) {
   try {
     const resourceUrl = new URL(uri);
     const SCHEMA_PATH = "schema";
@@ -56,8 +58,8 @@ export async function handleReadResource(uri: string) {
     }
 
     // Use adapter-specific query to describe the table
-    const query = getDescribeTableQuery(tableName!);
-    const result = await dbAll(query);
+    const query = getDescribeTableQuery(dbId, tableName!);
+    const result = await dbAll(dbId, query);
 
     return {
       contents: [

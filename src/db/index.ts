@@ -1,105 +1,94 @@
 import { DbAdapter, createDbAdapter } from './adapter.js';
 
-// Store the active database adapter
-let dbAdapter: DbAdapter | null = null;
+// Store the active database adapters by ID
+const dbAdapters: Record<string, DbAdapter> = {};
+const dbMetadatas: Record<string, { name: string, type: string, path?: string, server?: string, database?: string, description?: string }> = {};
 
 /**
- * Initialize the database connection
+ * Initialize a database connection and register it by ID
+ * @param dbId Unique database identifier
  * @param connectionInfo Connection information object or SQLite path string
- * @param dbType Database type ('sqlite' or 'sqlserver')
+ * @param dbType Database type ('sqlite', 'sqlserver', etc.)
+ * @param description Optional description for the database
  */
-export async function initDatabase(connectionInfo: any, dbType: string = 'sqlite'): Promise<void> {
+export async function initDatabase(dbId: string, connectionInfo: any, dbType: string = 'sqlite', description?: string): Promise<void> {
   try {
-    // If connectionInfo is a string, assume it's a SQLite path
     if (typeof connectionInfo === 'string') {
       connectionInfo = { path: connectionInfo };
     }
-
-    // Create appropriate adapter based on database type
-    dbAdapter = createDbAdapter(dbType, connectionInfo);
-    
-    // Initialize the connection
-    await dbAdapter.init();
+    const adapter = createDbAdapter(dbType, connectionInfo);
+    await adapter.init();
+    dbAdapters[dbId] = adapter;
+    dbMetadatas[dbId] = { ...adapter.getMetadata(), description };
   } catch (error) {
-    throw new Error(`Failed to initialize database: ${(error as Error).message}`);
+    throw new Error(`Failed to initialize database '${dbId}': ${(error as Error).message}`);
   }
 }
 
 /**
- * Execute a SQL query and get all results
- * @param query SQL query to execute
- * @param params Query parameters
- * @returns Promise with query results
+ * Get all registered database IDs and their metadata
  */
-export function dbAll(query: string, params: any[] = []): Promise<any[]> {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.all(query, params);
+export function listDatabases() {
+  return Object.entries(dbMetadatas).map(([id, meta]) => ({ id, ...meta }));
 }
 
 /**
- * Execute a SQL query that modifies data
- * @param query SQL query to execute
- * @param params Query parameters
- * @returns Promise with result info
+ * Execute a SQL query and get all results for a specific database
  */
-export function dbRun(query: string, params: any[] = []): Promise<{ changes: number, lastID: number }> {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.run(query, params);
+export function dbAll(dbId: string, query: string, params: any[] = []): Promise<any[]> {
+  const adapter = dbAdapters[dbId];
+  if (!adapter) throw new Error(`Database '${dbId}' not initialized`);
+  return adapter.all(query, params);
 }
 
 /**
- * Execute multiple SQL statements
- * @param query SQL statements to execute
- * @returns Promise that resolves when execution completes
+ * Execute a SQL query that modifies data for a specific database
  */
-export function dbExec(query: string): Promise<void> {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.exec(query);
+export function dbRun(dbId: string, query: string, params: any[] = []): Promise<{ changes: number, lastID: number }> {
+  const adapter = dbAdapters[dbId];
+  if (!adapter) throw new Error(`Database '${dbId}' not initialized`);
+  return adapter.run(query, params);
 }
 
 /**
- * Close the database connection
+ * Execute multiple SQL statements for a specific database
  */
-export function closeDatabase(): Promise<void> {
-  if (!dbAdapter) {
-    return Promise.resolve();
-  }
-  return dbAdapter.close();
+export function dbExec(dbId: string, query: string): Promise<void> {
+  const adapter = dbAdapters[dbId];
+  if (!adapter) throw new Error(`Database '${dbId}' not initialized`);
+  return adapter.exec(query);
 }
 
 /**
- * Get database metadata
+ * Close all database connections
  */
-export function getDatabaseMetadata(): { name: string, type: string, path?: string, server?: string, database?: string } {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.getMetadata();
+export async function closeAllDatabases(): Promise<void> {
+  await Promise.all(Object.values(dbAdapters).map(adapter => adapter.close()));
 }
 
 /**
- * Get database-specific query for listing tables
+ * Get metadata for a specific database
  */
-export function getListTablesQuery(): string {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.getListTablesQuery();
+export function getDatabaseMetadata(dbId: string): { name: string, type: string, path?: string, server?: string, database?: string, description?: string } {
+  const meta = dbMetadatas[dbId];
+  if (!meta) throw new Error(`Database '${dbId}' not initialized`);
+  return meta;
 }
 
 /**
- * Get database-specific query for describing a table
- * @param tableName Table name
+ * Get database-specific query for listing tables for a specific database
  */
-export function getDescribeTableQuery(tableName: string): string {
-  if (!dbAdapter) {
-    throw new Error("Database not initialized");
-  }
-  return dbAdapter.getDescribeTableQuery(tableName);
+export function getListTablesQuery(dbId: string): string {
+  const adapter = dbAdapters[dbId];
+  if (!adapter) throw new Error(`Database '${dbId}' not initialized`);
+  return adapter.getListTablesQuery();
+}
+
+/**
+ * Get database-specific query for describing a table for a specific database
+ */
+export function getDescribeTableQuery(dbId: string, tableName: string): string {
+  const adapter = dbAdapters[dbId];
+  if (!adapter) throw new Error(`Database '${dbId}' not initialized`);
+  return adapter.getDescribeTableQuery(tableName);
 } 
