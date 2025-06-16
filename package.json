@@ -23,7 +23,7 @@
         "clean": "rimraf dist"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "1.9.0",
+        "@modelcontextprotocol/sdk": "^1.9.0",
         "mssql": "11.0.1",
         "mysql2": "^3.14.1",
         "pg": "^8.11.3",
@@ -35,6 +35,7 @@
         "@types/sqlite3": "5.1.0",
         "rimraf": "^5.0.5",
         "shx": "0.4.0",
+        "tsx": "^4.20.3",
         "typescript": "5.8.3"
     }
 }

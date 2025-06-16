@@ -1,24 +1,27 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/executeautomation-mcp-database-server-badge.png)](https://mseep.ai/app/executeautomation-mcp-database-server)
-
 # MCP Database Server
+
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/executeautomation-mcp-database-server-badge.png)](https://mseep.ai/app/executeautomation-mcp-database-server)
 
 This MCP (Model Context Protocol) server provides database access capabilities to Claude, supporting SQLite, SQL Server, PostgreSQL, and MySQL databases.
 
 ## Installation
 
 1. Clone the repository:
-```
+
+```shell
 git clone https://github.com/executeautomation/database-server.git
 cd database-server
 ```
 
-2. Install dependencies:
-```
+1. Install dependencies:
+
+```shell
 npm install
 ```
 
-3. Build the project:
-```
+1. Build the project:
+
+```shell
 npm run build
 ```
 
@@ -52,23 +55,25 @@ If you want to modify the code or run from your local environment:
 
 To use with an SQLite database:
 
-```
-node dist/src/index.js /path/to/your/database.db
+```shell
+node dist/src/index.js /path/to/your/database.db [--insights-db <insights_db_path>]
 ```
 
 ### SQL Server Database
 
 To use with a SQL Server database:
 
-```
+```shell
 node dist/src/index.js --sqlserver --server <server-name> --database <database-name> [--user <username> --password <password>]
 ```
 
 Required parameters:
+
 - `--server`: SQL Server host name or IP address
 - `--database`: Name of the database
 
 Optional parameters:
+
 - `--user`: Username for SQL Server authentication (if not provided, Windows Authentication will be used)
 - `--password`: Password for SQL Server authentication
 - `--port`: Port number (default: 1433)
@@ -77,15 +82,17 @@ Optional parameters:
 
 To use with a PostgreSQL database:
 
-```
+```shell
 node dist/src/index.js --postgresql --host <host-name> --database <database-name> [--user <username> --password <password>]
 ```
 
 Required parameters:
+
 - `--host`: PostgreSQL host name or IP address
 - `--database`: Name of the database
 
 Optional parameters:
+
 - `--user`: Username for PostgreSQL authentication
 - `--password`: Password for PostgreSQL authentication
 - `--port`: Port number (default: 5432)
@@ -96,135 +103,167 @@ Optional parameters:
 
 To use with a MySQL database:
 
-```
-node dist/src/index.js --mysql --host <host-name> --database <database-name> --port <port> [--user <username> --password <password>]
+```shell
+node dist/src/index.js --mysql --host <host-name> --database <database-name> [--user <username> --password <password> --port <port>]
 ```
 
 Required parameters:
+
 - `--host`: MySQL host name or IP address
 - `--database`: Name of the database
-- `--port`: Port number (default: 3306)
 
 Optional parameters:
+
 - `--user`: Username for MySQL authentication
 - `--password`: Password for MySQL authentication
 - `--ssl`: Enable SSL connection (true/false or object)
 - `--connection-timeout`: Connection timeout in milliseconds (default: 30000)
+- `--port`: Port number (default: 3306)
 
-## Configuring Claude Desktop
+## Multi-Database Configuration
 
-### Direct Usage Configuration
+### Using a Config File for Multiple Databases
 
-If you installed the package globally, configure Claude Desktop with:
+You can now start the MCP server with access to multiple databases by specifying a JSON config file via the `--config <file>` command line argument. This enables you to manage and query multiple databases simultaneously.
 
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@executeautomation/database-server",
-        "/path/to/your/database.db"
-      ]
-    },
-    "sqlserver": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@executeautomation/database-server",
-        "--sqlserver",
-        "--server", "your-server-name",
-        "--database", "your-database-name",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    },
-    "postgresql": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@executeautomation/database-server",
-        "--postgresql",
-        "--host", "your-host-name",
-        "--database", "your-database-name",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    },
-    "mysql": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@executeautomation/database-server",
-        "--mysql",
-        "--host", "your-host-name",
-        "--database", "your-database-name",
-        "--port", "3306",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    }
-  }
-}
-```
+- **Config file location:** You can use either an absolute or relative path for the config file. A common convention is to place it in your project root, e.g., `./db-config.json`.
+- **Config file format:** See below for an example. Each key is a unique `dbId` for the database.
 
-### Local Development Configuration
-
-For local development, configure Claude Desktop to use your locally built version:
+#### Example Config File
 
 ```json
 {
-  "mcpServers": {
-    "sqlite": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-database-server/dist/src/index.js", 
-        "/path/to/your/database.db"
-      ]
-    },
-    "sqlserver": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-database-server/dist/src/index.js",
-        "--sqlserver",
-        "--server", "your-server-name",
-        "--database", "your-database-name",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    },
-    "postgresql": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-database-server/dist/src/index.js",
-        "--postgresql",
-        "--host", "your-host-name",
-        "--database", "your-database-name",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    },
-    "mysql": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-database-server/dist/src/index.js",
-        "--mysql",
-        "--host", "your-host-name",
-        "--database", "your-database-name",
-        "--port", "3306",
-        "--user", "your-username",
-        "--password", "your-password"
-      ]
-    }
-  }
+  "main_sqlite": {
+    "type": "sqlite",
+    "description": "Primary SQLite DB",
+    "path": "/data/main.db"
+  },
+  "analytics_pg": {
+    "type": "postgresql",
+    "description": "Analytics PostgreSQL DB",
+    "host": "localhost",
+    "database": "analytics",
+    "user": "user",
+    "password": "pass"
+  },
+  "insights_db": "./insights.sqlite"
 }
 ```
 
-The Claude Desktop configuration file is typically located at:
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
+#### Supported Database Types and Required Fields
+
+| type        | Required Fields                                 | Optional Fields      |
+|-------------|-------------------------------------------------|---------------------|
+| sqlite      | path                                            | description         |
+| sqlserver   | server, database                                | user, password, port, description |
+| postgresql  | host, database                                  | user, password, port, ssl, connectionTimeout, description |
+| mysql       | host, database                            | user, password, port, ssl, connectionTimeout, description |
+
+#### Starting the Server with Multiple Databases
+
+```shell
+node dist/src/index.js --config path/to/config.json
+```
+
+#### Listing Available Databases
+
+A new tool, `list_databases`, is available to enumerate all configured databases by ID, type, and description. You can call this tool to discover which `dbId` values are available for use in subsequent requests.
+
+**Example tool call:**
+
+```json
+{
+  "name": "list_databases",
+  "arguments": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "databases": [
+    { "id": "main_sqlite", "type": "sqlite", "description": "Primary SQLite DB" },
+    { "id": "analytics_pg", "type": "postgresql", "description": "Analytics PostgreSQL DB" }
+  ]
+}
+```
+
+#### Specifying dbId in Requests
+
+- For all resource and tool requests, you must now specify the `dbId` parameter to indicate which database to operate on.
+- **Tool call example:**
+
+  ```json
+  {
+    "dbId": "main_sqlite",
+    "query": "SELECT * FROM users"
+  }
+  ```
+
+- **Resource request example:**
+
+  ```json
+  {
+    "dbId": "main_sqlite",
+    "uri": "sqlite:///data/main.db/users/schema"
+  }
+  ```
+
+- For resource requests, include `dbId` in the request parameters.
+
+#### Backward Compatibility
+
+If you do not use the `--config` option, the server will operate in single-database mode as before, and `dbId` will default to `default` internally. You can continue to use the CLI as before for single-database use cases.
+
+### Insights Database Configuration
+
+You can configure a separate SQLite database for storing business insights (used by the append_insight and list_insights tools). This is independent of your main data sources and is always writable.
+
+- **Config file:** Add a top-level field `"insights_db"` with the path to a SQLite file (e.g., `"./insights.sqlite"`).
+- **CLI option:** In single-db mode, use `--insights-db <path>` to specify the insights database file.
+- **Default:** If not set, the default is `./insights.sqlite` in the project root.
+- **Ephemeral:** Use `:memory:` as the path for a non-persistent, in-memory insights database.
+
+This ensures insights are always writable and never stored in your main (possibly read-only) databases.
+
+## Environment Variables
+
+No environment variables are required by default. If you wish to use environment variables for secrets (e.g., DB passwords), you can reference them in your config file using your own scripting or config management approach.
+
+## Troubleshooting
+
+**Common errors and solutions:**
+
+- **Config file not found:**
+  - Ensure the path to your config file is correct and the file exists.
+- **Invalid config file format:**
+  - The config file must be a valid JSON object mapping dbId to config objects.
+- **Missing dbId in request:**
+  - All requests must specify a valid `dbId` when in multi-database mode.
+- **Database connection errors:**
+  - Check your connection parameters (host, user, password, etc.) and ensure the database server is running and accessible.
+- **Unsupported database type:**
+  - Ensure the `type` field in your config is one of: `sqlite`, `sqlserver`, `postgresql`, or `mysql`.
+
+## Running Tests
+
+If you have tests:
+
+```shell
+npm test
+```
+
+If not, you can check your build and lint the code with:
+
+```shell
+npm run build
+npm run lint
+```
+
+## Contact / Support
+
+For help, questions, or to report bugs, please open an issue on the [GitHub Issues page](https://github.com/executeautomation/database-server/issues).
 
 ## Available Database Tools
 
@@ -243,6 +282,8 @@ The MCP Database Server provides the following tools that Claude can use:
 | `append_insight` | Add a business insight to memo | `insight`: Text of insight |
 | `list_insights` | List all business insights | None |
 
+> **Note:** The `append_insight` and `list_insights` tools are currently mock implementations and do not persist insights between requests.
+
 For practical examples of how to use these tools with Claude, see [Usage Examples](docs/usage-examples.md).
 
 ## Additional Documentation
@@ -255,13 +296,13 @@ For practical examples of how to use these tools with Claude, see [Usage Example
 
 To run the server in development mode:
 
-```
+```shell
 npm run dev
 ```
 
 To watch for changes during development:
 
-```
+```shell
 npm run watch
 ```
 

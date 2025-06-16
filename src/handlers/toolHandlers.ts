@@ -1,7 +1,7 @@
 import { formatErrorResponse } from '../utils/formatUtils.js';
 
 // Import all tool implementations
-import { readQuery, writeQuery, exportQuery } from '../tools/queryTools.js';
+import { readQuery, writeQuery, exportQuery, listDatabasesTool } from '../tools/queryTools.js';
 import { createTable, alterTable, dropTable, listTables, describeTable } from '../tools/schemaTools.js';
 import { appendInsight, listInsights } from '../tools/insightTools.js';
 
@@ -18,9 +18,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             query: { type: "string" },
           },
-          required: ["query"],
+          required: ["dbId", "query"],
         },
       },
       {
@@ -29,9 +30,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             query: { type: "string" },
           },
-          required: ["query"],
+          required: ["dbId", "query"],
         },
       },
       {
@@ -40,9 +42,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             query: { type: "string" },
           },
-          required: ["query"],
+          required: ["dbId", "query"],
         },
       },
       {
@@ -51,9 +54,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             query: { type: "string" },
           },
-          required: ["query"],
+          required: ["dbId", "query"],
         },
       },
       {
@@ -62,10 +66,11 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             table_name: { type: "string" },
             confirm: { type: "boolean" },
           },
-          required: ["table_name", "confirm"],
+          required: ["dbId", "table_name", "confirm"],
         },
       },
       {
@@ -74,10 +79,11 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             query: { type: "string" },
             format: { type: "string", enum: ["csv", "json"] },
           },
-          required: ["query", "format"],
+          required: ["dbId", "query", "format"],
         },
       },
       {
@@ -85,7 +91,10 @@ export function handleListTools() {
         description: "Get a list of all tables in the database",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            dbId: { type: "string" },
+          },
+          required: ["dbId"],
         },
       },
       {
@@ -94,9 +103,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             table_name: { type: "string" },
           },
-          required: ["table_name"],
+          required: ["dbId", "table_name"],
         },
       },
       {
@@ -105,9 +115,10 @@ export function handleListTools() {
         inputSchema: {
           type: "object",
           properties: {
+            dbId: { type: "string" },
             insight: { type: "string" },
           },
-          required: ["insight"],
+          required: ["dbId", "insight"],
         },
       },
       {
@@ -115,7 +126,20 @@ export function handleListTools() {
         description: "List all business insights in the memo",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            dbId: { type: "string" },
+          },
+          required: ["dbId"],
+        },
+      },
+      {
+        name: "list_databases",
+        description: "List all available databases by ID and description.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            dbId: { type: "string", description: "Optional database ID to filter results" }
+          },
         },
       },
     ],
@@ -132,35 +156,27 @@ export async function handleToolCall(name: string, args: any) {
   try {
     switch (name) {
       case "read_query":
-        return await readQuery(args.query);
-      
+        return await readQuery(args.dbId, args.query);
       case "write_query":
-        return await writeQuery(args.query);
-      
+        return await writeQuery(args.dbId, args.query);
       case "create_table":
-        return await createTable(args.query);
-      
+        return await createTable(args.dbId, args.query);
       case "alter_table":
-        return await alterTable(args.query);
-      
+        return await alterTable(args.dbId, args.query);
       case "drop_table":
-        return await dropTable(args.table_name, args.confirm);
-      
+        return await dropTable(args.dbId, args.table_name, args.confirm);
       case "export_query":
-        return await exportQuery(args.query, args.format);
-      
+        return await exportQuery(args.dbId, args.query, args.format);
       case "list_tables":
-        return await listTables();
-      
+        return await listTables(args.dbId);
       case "describe_table":
-        return await describeTable(args.table_name);
-      
+        return await describeTable(args.dbId, args.table_name);
       case "append_insight":
-        return await appendInsight(args.insight);
-      
+        return await appendInsight(args.dbId, args.insight);
       case "list_insights":
-        return await listInsights();
-      
+        return await listInsights(args.dbId);
+      case "list_databases":
+        return await listDatabasesTool();
       default:
         throw new Error(`Unknown tool: ${name}`);
     }

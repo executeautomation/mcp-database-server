@@ -10,11 +10,16 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Import database utils
-import { initDatabase, closeDatabase, getDatabaseMetadata } from './db/index.js';
+import { initDatabase, closeAllDatabases, getDatabaseMetadata, listDatabases } from './db/index.js';
+import fs from 'fs';
+import path from 'path';
 
 // Import handlers
 import { handleListResources, handleReadResource } from './handlers/resourceHandlers.js';
 import { handleListTools, handleToolCall } from './handlers/toolHandlers.js';
+
+// Import insights database utils
+import { initInsightsDb, closeInsightsDb } from './tools/insightsDb.js';
 
 // Setup a logger that uses stderr instead of stdout to avoid interfering with MCP communications
 const logger = {
@@ -40,12 +45,54 @@ const server = new Server(
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-if (args.length === 0) {
+
+// Check for --config <file> argument
+let configFile: string | null = null;
+let configArgIndex = args.indexOf('--config');
+if (configArgIndex !== -1 && args[configArgIndex + 1]) {
+  configFile = args[configArgIndex + 1];
+}
+
+// Parse --insights-db <path> argument (for single-db mode)
+let insightsDbPath: string | undefined = undefined;
+let insightsDbArgIndex = args.indexOf('--insights-db');
+if (insightsDbArgIndex !== -1 && args[insightsDbArgIndex + 1]) {
+  insightsDbPath = args[insightsDbArgIndex + 1];
+}
+
+let multiDbMode = false;
+let dbConfigs: Record<string, any> = {};
+
+if (configFile) {
+  // Multi-database mode
+  multiDbMode = true;
+  const configPath = path.isAbsolute(configFile) ? configFile : path.join(process.cwd(), configFile);
+  if (!fs.existsSync(configPath)) {
+    logger.error(`Config file not found: ${configPath}`);
+    process.exit(1);
+  }
+  try {
+    const configRaw = fs.readFileSync(configPath, 'utf-8');
+    dbConfigs = JSON.parse(configRaw);
+    if (typeof dbConfigs !== 'object' || Array.isArray(dbConfigs)) {
+      throw new Error('Config file must be an object mapping dbId to config');
+    }
+    // Look for top-level insights_db field
+    if (typeof dbConfigs.insights_db === 'string') {
+      insightsDbPath = dbConfigs.insights_db;
+    }
+  } catch (e) {
+    logger.error('Failed to parse config file:', e);
+    process.exit(1);
+  }
+} else if (args.length === 0) {
   logger.error("Please provide database connection information");
-  logger.error("Usage for SQLite: node index.js <database_file_path>");
+  logger.error("Usage for SQLite: node index.js <database_file_path> [--insights-db <insights_db_path>]");
   logger.error("Usage for SQL Server: node index.js --sqlserver --server <server> --database <database> [--user <user> --password <password>]");
   logger.error("Usage for PostgreSQL: node index.js --postgresql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL: node index.js --mysql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
+  logger.error("Or use --config <file> for multiple databases");
+  logger.error("Optional: --insights-db <insights_db_path> to specify insights database");
   process.exit(1);
 }
 
@@ -168,12 +215,17 @@ else if (args.includes('--mysql')) {
 }
 
 // Set up request handlers
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  return await handleListResources();
+server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+  // Require dbId in multiDbMode, use 'default' in single-db mode
+  const dbId: string = multiDbMode ? (request?.params?.dbId as string) : 'default';
+  if (!dbId) throw new Error('dbId is required');
+  return await handleListResources(dbId);
 });
 
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  return await handleReadResource(request.params.uri);
+  const dbId: string = multiDbMode ? (request?.params?.dbId as string) : 'default';
+  if (!dbId) throw new Error('dbId is required');
+  return await handleReadResource(dbId, request.params.uri);
 });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -187,13 +239,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Handle shutdown gracefully
 process.on('SIGINT', async () => {
   logger.info('Shutting down gracefully...');
-  await closeDatabase();
+  await closeAllDatabases();
+  await closeInsightsDb();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   logger.info('Shutting down gracefully...');
-  await closeDatabase();
+  await closeAllDatabases();
+  await closeInsightsDb();
   process.exit(0);
 });
 
@@ -211,22 +265,36 @@ process.on('unhandledRejection', (reason, promise) => {
  */
 async function runServer() {
   try {
-    logger.info(`Initializing ${dbType} database...`);
-    if (dbType === 'sqlite') {
-      logger.info(`Database path: ${connectionInfo}`);
-    } else if (dbType === 'sqlserver') {
-      logger.info(`Server: ${connectionInfo.server}, Database: ${connectionInfo.database}`);
-    } else if (dbType === 'postgresql') {
-      logger.info(`Host: ${connectionInfo.host}, Database: ${connectionInfo.database}`);
-    } else if (dbType === 'mysql') {
-      logger.info(`Host: ${connectionInfo.host}, Database: ${connectionInfo.database}`);
+    // Initialize insights database (always)
+    await initInsightsDb(insightsDbPath);
+    if (multiDbMode) {
+      logger.info(`Initializing databases from config file: ${configFile}`);
+      for (const [dbId, dbConfig] of Object.entries(dbConfigs)) {
+        // Skip the top-level insights_db field
+        if (dbId === 'insights_db') continue;
+        const { type, description, ...connectionInfo } = dbConfig;
+        logger.info(`Initializing [${dbId}] (${type}): ${description || ''}`);
+        await initDatabase(dbId, connectionInfo, type, description);
+      }
+      logger.info(`Initialized ${Object.keys(dbConfigs).length - (dbConfigs.insights_db ? 1 : 0)} databases.`);
+    } else {
+      logger.info(`Initializing ${dbType} database...`);
+      if (dbType === 'sqlite') {
+        logger.info(`Database path: ${connectionInfo}`);
+      } else if (dbType === 'sqlserver') {
+        logger.info(`Server: ${connectionInfo.server}, Database: ${connectionInfo.database}`);
+      } else if (dbType === 'postgresql') {
+        logger.info(`Host: ${connectionInfo.host}, Database: ${connectionInfo.database}`);
+      } else if (dbType === 'mysql') {
+        logger.info(`Host: ${connectionInfo.host}, Database: ${connectionInfo.database}`);
+      }
+      
+      // Initialize the database
+      await initDatabase('default', connectionInfo, dbType);
+      
+      const dbInfo = getDatabaseMetadata('default');
+      logger.info(`Connected to ${dbInfo.name} database`);
     }
-    
-    // Initialize the database
-    await initDatabase(connectionInfo, dbType);
-    
-    const dbInfo = getDatabaseMetadata();
-    logger.info(`Connected to ${dbInfo.name} database`);
     
     logger.info('Starting MCP server...');
     const transport = new StdioServerTransport();

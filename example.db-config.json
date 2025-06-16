@@ -1,0 +1,31 @@
+{
+  "main_sqlserver": {
+    "type": "sqlserver",
+    "server": "localhost",
+    "port": 1433,
+    "database": "master",
+    "user": "sa",
+    "password": "12345678"
+  },
+  "main_postgres": {
+    "type": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "user": "your_pg_user",
+    "password": "your_pg_password",
+    "database": "your_pg_db"
+  },
+  "analytics_mysql": {
+    "type": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "user": "your_mysql_user",
+    "password": "your_mysql_password",
+    "database": "your_mysql_db"
+  },
+  "local_sqlite": {
+    "type": "sqlite",
+    "path": "./data/local.sqlite"
+  },
+  "insights_db": "./insights.sqlite"
+} 

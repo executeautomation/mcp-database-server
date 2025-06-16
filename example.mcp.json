@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+        "database_server": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "tsx",
+                "./src/index.ts",
+                "--config",
+                "./.cursor/db-config.json"
+            ]
+        }
+    }
+}

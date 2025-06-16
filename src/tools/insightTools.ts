@@ -1,63 +1,38 @@
-import { dbAll, dbExec, dbRun } from '../db/index.js';
 import { formatSuccessResponse } from '../utils/formatUtils.js';
+import { getInsightsDb } from './insightsDb.js';
 
 /**
- * Add a business insight to the memo
- * @param insight Business insight text
+ * Add a business insight to the memo for a specific database
+ * @param dbId Database identifier
+ * @param insight The insight to add
  * @returns Result of the operation
  */
-export async function appendInsight(insight: string) {
+export async function appendInsight(dbId: string, insight: string) {
   try {
-    if (!insight) {
-      throw new Error("Insight text is required");
-    }
-
-    // Create insights table if it doesn't exist
-    await dbExec(`
-      CREATE TABLE IF NOT EXISTS mcp_insights (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        insight TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    // Insert the insight
-    await dbRun(
-      "INSERT INTO mcp_insights (insight) VALUES (?)",
-      [insight]
+    const db = getInsightsDb();
+    await db.run(
+      'INSERT INTO mcp_insights (db_id, insight) VALUES (?, ?)',
+      [dbId, insight]
     );
-    
-    return formatSuccessResponse({ success: true, message: "Insight added" });
+    return formatSuccessResponse({ dbId, insight, message: 'Insight appended' });
   } catch (error: any) {
-    throw new Error(`Error adding insight: ${error.message}`);
+    throw new Error(`Error appending insight: ${error.message}`);
   }
 }
 
 /**
- * List all insights in the memo
- * @returns Array of insights
+ * List all business insights in the memo for a specific database
+ * @param dbId Database identifier
+ * @returns List of insights
  */
-export async function listInsights() {
+export async function listInsights(dbId: string) {
   try {
-    // Check if insights table exists
-    const tableExists = await dbAll(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name = 'mcp_insights'"
+    const db = getInsightsDb();
+    const insights = await db.all(
+      'SELECT id, insight, created_at FROM mcp_insights WHERE db_id = ? ORDER BY created_at DESC',
+      [dbId]
     );
-    
-    if (tableExists.length === 0) {
-      // Create table if it doesn't exist
-      await dbExec(`
-        CREATE TABLE IF NOT EXISTS mcp_insights (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          insight TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      return formatSuccessResponse([]);
-    }
-    
-    const insights = await dbAll("SELECT * FROM mcp_insights ORDER BY created_at DESC");
-    return formatSuccessResponse(insights);
+    return formatSuccessResponse({ dbId, insights });
   } catch (error: any) {
     throw new Error(`Error listing insights: ${error.message}`);
   }
