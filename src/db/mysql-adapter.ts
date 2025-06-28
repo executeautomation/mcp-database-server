@@ -133,7 +133,7 @@ export class MysqlAdapter implements DbAdapter {
    * Get database-specific query for listing tables
    */
   getListTablesQuery(): string {
-    return "SHOW TABLES";
+    return `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = '${this.database}'`;
   }
 
   /**
