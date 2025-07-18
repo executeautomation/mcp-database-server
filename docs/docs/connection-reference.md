@@ -75,16 +75,33 @@ node dist/src/index.js --postgresql --host dbserver.example.com --database sampl
 | `--mysql` | Specifies MySQL mode | - | Yes |
 | `--host` | MySQL hostname or IP | - | Yes |
 | `--database` | Database name | - | Yes |
-| `--user` | MySQL username | - | No |
-| `--password` | MySQL password | - | No |
+| `--user` | MySQL username | - | No* |
+| `--password` | MySQL password | - | No* |
 | `--port` | MySQL port | 3306 | No |
 | `--ssl` | Use SSL connection (true/false or object) | false | No |
 | `--connection-timeout` | Connection timeout in ms | 30000 | No |
+| `--aws-iam-auth` | Enable AWS IAM authentication | false | No |
+| `--aws-region` | AWS region for RDS IAM auth | - | No** |
 
-### Example
+*Required for standard authentication  
+**Required when using `--aws-iam-auth`
+
+### Standard Authentication Example
 
 ```bash
 node dist/src/index.js --mysql --host localhost --database sample_db --port 3306 --user root --password secret
+```
+
+### AWS IAM Authentication Example
+
+**Prerequisites:** AWS credentials must be configured using the default credential provider chain:
+- `aws configure` (default profile) 
+- `AWS_PROFILE=myprofile` environment variable
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables
+- IAM roles (if running on EC2)
+
+```bash
+node dist/src/index.js --mysql --aws-iam-auth --host rds-endpoint.region.rds.amazonaws.com --database sample_db --user aws-username --aws-region us-east-1
 ```
 
 ## Environment Variables

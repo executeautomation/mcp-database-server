@@ -46,6 +46,7 @@ if (args.length === 0) {
   logger.error("Usage for SQL Server: node index.js --sqlserver --server <server> --database <database> [--user <user> --password <password>]");
   logger.error("Usage for PostgreSQL: node index.js --postgresql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL: node index.js --mysql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
+  logger.error("Usage for MySQL with AWS IAM: node index.js --mysql --aws-iam-auth --host <rds-endpoint> --database <database> --user <aws-username> --aws-region <region>");
   process.exit(1);
 }
 
@@ -132,7 +133,9 @@ else if (args.includes('--mysql')) {
     password: undefined,
     port: undefined,
     ssl: undefined,
-    connectionTimeout: undefined
+    connectionTimeout: undefined,
+    awsIamAuth: false,
+    awsRegion: undefined
   };
   // Parse MySQL connection parameters
   for (let i = 0; i < args.length; i++) {
@@ -153,12 +156,31 @@ else if (args.includes('--mysql')) {
       else connectionInfo.ssl = sslVal;
     } else if (args[i] === '--connection-timeout' && i + 1 < args.length) {
       connectionInfo.connectionTimeout = parseInt(args[i + 1], 10);
+    } else if (args[i] === '--aws-iam-auth') {
+      connectionInfo.awsIamAuth = true;
+    } else if (args[i] === '--aws-region' && i + 1 < args.length) {
+      connectionInfo.awsRegion = args[i + 1];
     }
   }
   // Validate MySQL connection info
   if (!connectionInfo.host || !connectionInfo.database) {
     logger.error("Error: MySQL requires --host and --database parameters");
     process.exit(1);
+  }
+  
+  // Additional validation for AWS IAM authentication
+  if (connectionInfo.awsIamAuth) {
+    if (!connectionInfo.user) {
+      logger.error("Error: AWS IAM authentication requires --user parameter");
+      process.exit(1);
+    }
+    if (!connectionInfo.awsRegion) {
+      logger.error("Error: AWS IAM authentication requires --aws-region parameter");
+      process.exit(1);
+    }
+    // Automatically enable SSL for AWS IAM authentication (required)
+    connectionInfo.ssl = true;
+    logger.info("AWS IAM authentication enabled - SSL automatically configured");
   }
 } else {
   // SQLite mode (default)

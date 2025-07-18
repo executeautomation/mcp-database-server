@@ -1,5 +1,6 @@
 import { DbAdapter } from "./adapter.js";
 import mysql from "mysql2/promise";
+import { Signer } from "@aws-sdk/rds-signer";
 
 /**
  * MySQL database adapter implementation
@@ -9,6 +10,8 @@ export class MysqlAdapter implements DbAdapter {
   private config: mysql.ConnectionOptions;
   private host: string;
   private database: string;
+  private awsIamAuth: boolean;
+  private awsRegion?: string;
 
   constructor(connectionInfo: {
     host: string;
@@ -18,9 +21,13 @@ export class MysqlAdapter implements DbAdapter {
     port?: number;
     ssl?: boolean | object;
     connectionTimeout?: number;
+    awsIamAuth?: boolean;
+    awsRegion?: string;
   }) {
     this.host = connectionInfo.host;
     this.database = connectionInfo.database;
+    this.awsIamAuth = connectionInfo.awsIamAuth || false;
+    this.awsRegion = connectionInfo.awsRegion;
     this.config = {
       host: connectionInfo.host,
       database: connectionInfo.database,
@@ -33,7 +40,14 @@ export class MysqlAdapter implements DbAdapter {
     if (typeof connectionInfo.ssl === 'object' || typeof connectionInfo.ssl === 'string') {
       this.config.ssl = connectionInfo.ssl;
     } else if (connectionInfo.ssl === true) {
-      this.config.ssl = {};
+      // For AWS IAM authentication, configure SSL appropriately for RDS
+      if (this.awsIamAuth) {
+        this.config.ssl = {
+          rejectUnauthorized: false // AWS RDS handles certificate validation
+        };
+      } else {
+        this.config.ssl = {};
+      }
     }
     // Validate port
     if (connectionInfo.port && typeof connectionInfo.port !== 'number') {
@@ -48,16 +62,73 @@ export class MysqlAdapter implements DbAdapter {
   }
 
   /**
+   * Generate AWS RDS authentication token
+   */
+  private async generateAwsAuthToken(): Promise<string> {
+    if (!this.awsRegion) {
+      throw new Error("AWS region is required for IAM authentication");
+    }
+    
+    if (!this.config.user) {
+      throw new Error("AWS username is required for IAM authentication");
+    }
+    
+    try {
+      console.error(`[INFO] Generating AWS auth token for region: ${this.awsRegion}, host: ${this.host}, user: ${this.config.user}`);
+      
+      const signer = new Signer({
+        region: this.awsRegion,
+        hostname: this.host,
+        port: this.config.port || 3306,
+        username: this.config.user,
+      });
+      
+      const token = await signer.getAuthToken();
+      console.error(`[INFO] AWS auth token generated successfully`);
+      return token;
+    } catch (err) {
+      console.error(`[ERROR] Failed to generate AWS auth token: ${(err as Error).message}`);
+      throw new Error(`AWS IAM authentication failed: ${(err as Error).message}. Please check your AWS credentials and IAM permissions.`);
+    }
+  }
+
+  /**
    * Initialize MySQL connection
    */
   async init(): Promise<void> {
     try {
       console.error(`[INFO] Connecting to MySQL: ${this.host}, Database: ${this.database}`);
-      this.connection = await mysql.createConnection(this.config);
+      
+      // Handle AWS IAM authentication
+      if (this.awsIamAuth) {
+        console.error(`[INFO] Using AWS IAM authentication for user: ${this.config.user}`);
+        
+        try {
+          const authToken = await this.generateAwsAuthToken();
+          
+          // Create a new config with the generated token as password
+          const awsConfig = {
+            ...this.config,
+            password: authToken
+          };
+          
+          this.connection = await mysql.createConnection(awsConfig);
+        } catch (err) {
+          console.error(`[ERROR] AWS IAM authentication failed: ${(err as Error).message}`);
+          throw new Error(`AWS IAM authentication failed: ${(err as Error).message}`);
+        }
+      } else {
+        this.connection = await mysql.createConnection(this.config);
+      }
+      
       console.error(`[INFO] MySQL connection established successfully`);
     } catch (err) {
       console.error(`[ERROR] MySQL connection error: ${(err as Error).message}`);
-      throw new Error(`Failed to connect to MySQL: ${(err as Error).message}`);
+      if (this.awsIamAuth) {
+        throw new Error(`Failed to connect to MySQL with AWS IAM authentication: ${(err as Error).message}. Please verify your AWS credentials, IAM permissions, and RDS configuration.`);
+      } else {
+        throw new Error(`Failed to connect to MySQL: ${(err as Error).message}`);
+      }
     }
   }
 
