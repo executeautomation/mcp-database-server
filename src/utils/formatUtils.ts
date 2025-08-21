@@ -59,3 +59,12 @@ export function formatSuccessResponse(data: any): { content: Array<{type: string
     isError: false
   };
 } 
+export function formatSuccessResponseHTML(html: string): { content: Array<{ type: string, text: string }>, isError: boolean } {
+  return {
+    content: [{
+      type: "html",
+      text: html
+    }],
+    isError: false
+  };
+}
